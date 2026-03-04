@@ -25,25 +25,31 @@ const DEFAULT_QUESTIONS: Question[] = [
   { id: '5', text: 'Is 1 + 1 equal to 2?', correctAnswer: true },
 ];
 
-const TIMER_DURATION = 10; // seconds per question
-
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('START');
   const [questions, setQuestions] = useState<Question[]>(() => {
     const saved = localStorage.getItem('kids-quiz-questions');
     return saved ? JSON.parse(saved) : DEFAULT_QUESTIONS;
   });
+  const [timerDuration, setTimerDuration] = useState<number>(() => {
+    const saved = localStorage.getItem('kids-quiz-timer-duration');
+    return saved ? parseInt(saved) : 10;
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_DURATION);
+  const [timeLeft, setTimeLeft] = useState(timerDuration);
   const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [showNext, setShowNext] = useState(false);
 
-  // Persist questions
+  // Persist questions and settings
   useEffect(() => {
     localStorage.setItem('kids-quiz-questions', JSON.stringify(questions));
   }, [questions]);
+
+  useEffect(() => {
+    localStorage.setItem('kids-quiz-timer-duration', timerDuration.toString());
+  }, [timerDuration]);
 
   // Timer logic
   useEffect(() => {
@@ -61,7 +67,7 @@ export default function App() {
   const handleStart = () => {
     setCurrentIndex(0);
     setScore(0);
-    setTimeLeft(TIMER_DURATION);
+    setTimeLeft(timerDuration);
     setSelectedAnswer(null);
     setIsCorrect(null);
     setShowNext(false);
@@ -81,7 +87,7 @@ export default function App() {
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
-      setTimeLeft(TIMER_DURATION);
+      setTimeLeft(timerDuration);
       setSelectedAnswer(null);
       setIsCorrect(null);
       setShowNext(false);
@@ -118,14 +124,26 @@ export default function App() {
             <ThumbsUp className="w-8 h-8" />
             Kids Quiz!
           </h1>
-          {gameState !== 'PLAYING' && (
-            <button 
-              onClick={() => setGameState(gameState === 'SETUP' ? 'START' : 'SETUP')}
-              className="p-2 hover:bg-amber-500 rounded-full transition-colors"
-            >
-              {gameState === 'SETUP' ? <Home /> : <Settings />}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {gameState !== 'START' && gameState !== 'SETUP' && (
+              <button 
+                onClick={() => setGameState('START')}
+                className="p-2 hover:bg-amber-500 rounded-full transition-colors"
+                title="Go Home"
+              >
+                <Home className="w-6 h-6" />
+              </button>
+            )}
+            {gameState !== 'PLAYING' && (
+              <button 
+                onClick={() => setGameState(gameState === 'SETUP' ? 'START' : 'SETUP')}
+                className="p-2 hover:bg-amber-500 rounded-full transition-colors"
+                title={gameState === 'SETUP' ? "Back" : "Settings"}
+              >
+                {gameState === 'SETUP' ? <RotateCcw className="w-6 h-6" /> : <Settings className="w-6 h-6" />}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="p-8">
@@ -160,16 +178,31 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="space-y-8"
+                className="space-y-6"
               >
                 {/* Progress & Timer */}
-                <div className="flex justify-between items-center">
-                  <div className="text-sm font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full">
-                    Question {currentIndex + 1} of {questions.length}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full">
+                      Question {currentIndex + 1} of {questions.length}
+                    </div>
+                    <div className={`flex items-center gap-2 font-mono font-bold text-xl ${timeLeft < 4 ? 'text-red-500 animate-pulse' : 'text-slate-600'}`}>
+                      <TimerIcon className="w-5 h-5" />
+                      {timeLeft}s
+                    </div>
                   </div>
-                  <div className={`flex items-center gap-2 font-mono font-bold text-xl ${timeLeft < 4 ? 'text-red-500 animate-pulse' : 'text-slate-600'}`}>
-                    <TimerIcon className="w-5 h-5" />
-                    {timeLeft}s
+                  
+                  {/* Progress Bar */}
+                  <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                    <motion.div 
+                      initial={{ width: '100%' }}
+                      animate={{ 
+                        width: `${(timeLeft / timerDuration) * 100}%`,
+                        backgroundColor: timeLeft < 4 ? '#ef4444' : '#fbbf24'
+                      }}
+                      transition={{ duration: 1, ease: "linear" }}
+                      className="h-full"
+                    />
                   </div>
                 </div>
 
@@ -274,6 +307,34 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
+                <div className="space-y-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-amber-800 flex items-center gap-2">
+                      <TimerIcon className="w-4 h-4" /> Game Settings
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm font-medium text-amber-700">
+                      <span>Timer per question:</span>
+                      <span className="font-bold">{timerDuration} seconds</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="5" 
+                      max="30" 
+                      step="5"
+                      value={timerDuration}
+                      onChange={(e) => setTimerDuration(parseInt(e.target.value))}
+                      className="w-full h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                    <div className="flex justify-between text-[10px] text-amber-400 font-bold uppercase">
+                      <span>5s</span>
+                      <span>15s</span>
+                      <span>30s</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-bold text-slate-800">Edit Questions</h2>
                   <button 
